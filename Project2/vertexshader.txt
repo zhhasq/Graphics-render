@@ -1,0 +1,89 @@
+#version 330 core
+
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform vec3 colorVector;
+uniform vec4 globalAmbientVector;
+uniform vec4 lightPos;
+
+uniform vec4 localAmbientVector;
+uniform vec4 diffuseLight;
+uniform vec4 specularLight;
+uniform vec4 cameraVecor;
+
+uniform int isLocalLightOn;
+
+
+layout (location = 1)  in vec3 vertNormal;
+layout (location = 0)  in vec3 vertPosition;
+
+
+out vec4 vLightWeighting;
+flat out vec4 flatLightWeighting;
+
+void main()
+{		
+	gl_Position = projectionMatrix * modelViewMatrix * vec4(vertPosition, 1.0);
+	//global ambient 
+	vec4 globalLight = 0.2* globalAmbientVector;
+	
+	//local ambient 
+   	vec4 localAmbientcolor = 0.2 * localAmbientVector;
+	
+	
+
+	//get vertex postion in the camera coordinate
+	vec4 vertexPositionEye4 = modelViewMatrix * vec4(vertPosition, 1.0);
+	vec3 vertexPositionEye3 = vertexPositionEye4.xyz / vertexPositionEye4.w;
+	
+	
+	//get the direction of lighting 
+	vec4 lightPositionEye4 = modelViewMatrix * lightPos;
+	vec3 lightPositionEye3 = lightPositionEye4.xyz/ lightPositionEye4.w;
+	vec3 vertectorToLightSource = normalize(lightPositionEye3 - vertexPositionEye3);
+	//calculate the distance between light and vertex
+	float d = distance(vertexPositionEye3,lightPositionEye3);
+	
+	//change the vertex normal to camera space
+	mat4 normalMatrix = transpose(inverse(modelViewMatrix));
+	vec3 normalEye = normalize(vec3(normalMatrix * vec4(vertNormal,0.0)));
+	
+	//calculate diffuse light
+	float diffuseLightWeightning = max(dot(normalEye,vertectorToLightSource),0.0);
+	
+	//calculate specular light
+	vec3 reflectionVector = normalize(reflect(-vertectorToLightSource,normalEye));
+	//vec3 viewVectorEye = -normalize(vertexPositionEye3);
+
+	vec3 h = normalize(0.5*(vertectorToLightSource + vec3(0,0,1)));
+	
+	//phone model
+	vec3 cameraDir = vec3(0,0,1);
+	//float rdotv = max(dot(reflectionVector,cameraDir),0.0);
+	//Blinn-Phone (fixed pipe line)
+	float rdotv = max(dot(h,normalEye),0.0);
+
+	float specularLightWeightning = 0.0;
+	if(diffuseLightWeightning > 0){
+		specularLightWeightning = pow(rdotv,30);
+	}
+	//specularLightWeightning = clamp(specularLightWeightning, 0.0, 1.0);
+
+	//combine all the light component
+	if(isLocalLightOn == 1){
+		vLightWeighting = globalLight + localAmbientcolor + (1/1+0.1*d+0.01*d)*(0.8*diffuseLightWeightning *diffuseLight + 0.3* specularLightWeightning * specularLight);
+		flatLightWeighting = vLightWeighting;
+	}
+	if(isLocalLightOn == 0){
+		vLightWeighting = globalLight;
+		flatLightWeighting = vLightWeighting;
+	}
+	
+	
+
+	
+	//c_normal = vec3(normalMatrix  * vec4(vertNormal, 1.0));
+	//c_lightPosition = modelViewMatrix * lightPos;
+	
+	
+}
